@@ -34,6 +34,7 @@ public class SinkType extends StreamType {
     public static final String STARROCKS = "STARROCKS";
     public static final String KUDU = "KUDU";
     public static final String REDIS = "REDIS";
+    public static final String TUBEMQ = "TUBEMQ";
     /**
      * Tencent cloud log service
      * Details: <a href="https://www.tencentcloud.com/products/cls">CLS</a>
