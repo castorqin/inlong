@@ -17,6 +17,8 @@
 
 package org.apache.inlong.manager.service.sink.tube;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.List;
 import org.apache.inlong.manager.common.consts.DataNodeType;
 import org.apache.inlong.manager.common.consts.SinkType;
 import org.apache.inlong.manager.common.enums.ErrorCodeEnum;
@@ -31,17 +33,13 @@ import org.apache.inlong.manager.pojo.node.tube.TubeMQDataNodeDTO;
 import org.apache.inlong.manager.pojo.sink.SinkField;
 import org.apache.inlong.manager.pojo.sink.SinkRequest;
 import org.apache.inlong.manager.pojo.sink.StreamSink;
-import org.apache.inlong.manager.pojo.sink.cls.ClsSink;
+import org.apache.inlong.manager.pojo.sink.tube.TubeSink;
 import org.apache.inlong.manager.pojo.sink.tube.TubeSinkDTO;
 import org.apache.inlong.manager.pojo.sink.tube.TubeSinkRequest;
 import org.apache.inlong.manager.pojo.stream.InlongStreamExtParam;
 import org.apache.inlong.manager.service.sink.AbstractSinkOperator;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 @Service
 public class TubeSinkOperator extends AbstractSinkOperator {
@@ -86,7 +84,7 @@ public class TubeSinkOperator extends AbstractSinkOperator {
 
     @Override
     public StreamSink getFromEntity(StreamSinkEntity entity) {
-        ClsSink sink = new ClsSink();
+        TubeSink sink = new TubeSink();
         if (entity == null) {
             return sink;
         }

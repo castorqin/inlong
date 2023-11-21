@@ -42,7 +42,7 @@ public class TubeMQDataNodeRequest extends DataNodeRequest {
     private String sessionMaxDelayMsgCount;
     private String nettyWriteBufferHighWaterMark;
     private String rpcTimeOutMs;
-    private String sortChannelType;
+    private String tubeHbPeriodMs;
 
     public TubeMQDataNodeRequest() {
         super.setType(DataNodeType.TUBEMQ);

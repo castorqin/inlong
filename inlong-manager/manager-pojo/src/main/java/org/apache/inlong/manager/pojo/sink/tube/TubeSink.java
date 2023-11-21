@@ -46,6 +46,5 @@ public class TubeSink extends StreamSink {
     private String sessionWarnDelayedMsgCount;
     private String sessionMaxDelayedMsgCount;
     private String rpcTimeOutMs;
-    private String sortChannelType;
-
+    private String tubeHbPeriodMs;
 }

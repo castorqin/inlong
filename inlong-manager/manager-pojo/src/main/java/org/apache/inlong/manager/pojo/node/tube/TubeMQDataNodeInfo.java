@@ -44,7 +44,7 @@ public class TubeMQDataNodeInfo extends DataNodeInfo {
     private String sessionMaxDelayMsgCount;
     private String nettyWriteBufferHighWaterMark;
     private String rpcTimeOutMs;
-    private String sortChannelType;
+    private String tubeHbPeriodMs;
 
     @Override
     public DataNodeRequest genRequest() {

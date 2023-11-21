@@ -17,26 +17,32 @@
 
 package org.apache.inlong.manager.pojo.node.tube;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import javax.validation.constraints.NotNull;
+import lombok.Data;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.inlong.manager.common.enums.ErrorCodeEnum;
 import org.apache.inlong.manager.common.exceptions.BusinessException;
 import org.apache.inlong.manager.common.util.CommonBeanUtils;
 import org.apache.inlong.manager.common.util.JsonUtils;
 
-import lombok.Data;
-import org.apache.commons.lang3.StringUtils;
-
-import javax.validation.constraints.NotNull;
-
 @Data
 public class TubeMQDataNodeDTO {
 
+    @JsonProperty("master-host-port-list")
     private String masterHostList;
+    @JsonProperty("link_max_allowed_delayed_msg_count")
     private String linkMaxDelayMsgCount;
+    @JsonProperty("session_warn_delayed_msg_count")
     private String sessionWarnDelayedMsgCount;
+    @JsonProperty("session_max_allowed_delayed_msg_count")
     private String sessionMaxDelayMsgCount;
+    @JsonProperty("netty_write_buffer_high_water_mark")
     private String nettyWriteBufferHighWaterMark;
+    @JsonProperty("rpc_timeout_ms")
     private String rpcTimeOutMs;
-    private String sortChannelType;
+    @JsonProperty("tube_heartbeat_period_ms")
+    private String tubeHbPeriodMs;
 
     /**
      * Get the dto instance from the request
