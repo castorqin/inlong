@@ -17,8 +17,6 @@
 
 package org.apache.inlong.manager.service.sink.tube;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.List;
 import org.apache.inlong.manager.common.consts.DataNodeType;
 import org.apache.inlong.manager.common.consts.SinkType;
 import org.apache.inlong.manager.common.enums.ErrorCodeEnum;
@@ -38,11 +36,15 @@ import org.apache.inlong.manager.pojo.sink.tube.TubeMQSinkDTO;
 import org.apache.inlong.manager.pojo.sink.tube.TubeMQSinkRequest;
 import org.apache.inlong.manager.pojo.stream.InlongStreamExtParam;
 import org.apache.inlong.manager.service.sink.AbstractSinkOperator;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
-public class TubeSinkOperator extends AbstractSinkOperator {
+public class TubeMQSinkOperator extends AbstractSinkOperator {
 
     @Autowired
     private ObjectMapper objectMapper;

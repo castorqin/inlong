@@ -17,8 +17,6 @@
 
 package org.apache.inlong.manager.service.node.tube;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.inlong.manager.common.consts.DataNodeType;
 import org.apache.inlong.manager.common.enums.ErrorCodeEnum;
 import org.apache.inlong.manager.common.exceptions.BusinessException;
@@ -30,6 +28,9 @@ import org.apache.inlong.manager.pojo.node.tube.TubeMQDataNodeDTO;
 import org.apache.inlong.manager.pojo.node.tube.TubeMQDataNodeInfo;
 import org.apache.inlong.manager.pojo.node.tube.TubeMQDataNodeRequest;
 import org.apache.inlong.manager.service.node.AbstractDataNodeOperator;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;

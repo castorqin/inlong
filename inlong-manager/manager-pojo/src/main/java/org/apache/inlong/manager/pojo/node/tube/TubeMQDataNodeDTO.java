@@ -17,14 +17,16 @@
 
 package org.apache.inlong.manager.pojo.node.tube;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import javax.validation.constraints.NotNull;
-import lombok.Data;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.inlong.manager.common.enums.ErrorCodeEnum;
 import org.apache.inlong.manager.common.exceptions.BusinessException;
 import org.apache.inlong.manager.common.util.CommonBeanUtils;
 import org.apache.inlong.manager.common.util.JsonUtils;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.Data;
+import org.apache.commons.lang3.StringUtils;
+
+import javax.validation.constraints.NotNull;
 
 @Data
 public class TubeMQDataNodeDTO {
