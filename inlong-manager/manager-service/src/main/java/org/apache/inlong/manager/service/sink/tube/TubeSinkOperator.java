@@ -33,9 +33,9 @@ import org.apache.inlong.manager.pojo.node.tube.TubeMQDataNodeDTO;
 import org.apache.inlong.manager.pojo.sink.SinkField;
 import org.apache.inlong.manager.pojo.sink.SinkRequest;
 import org.apache.inlong.manager.pojo.sink.StreamSink;
-import org.apache.inlong.manager.pojo.sink.tube.TubeSink;
-import org.apache.inlong.manager.pojo.sink.tube.TubeSinkDTO;
-import org.apache.inlong.manager.pojo.sink.tube.TubeSinkRequest;
+import org.apache.inlong.manager.pojo.sink.tube.TubeMQSink;
+import org.apache.inlong.manager.pojo.sink.tube.TubeMQSinkDTO;
+import org.apache.inlong.manager.pojo.sink.tube.TubeMQSinkRequest;
 import org.apache.inlong.manager.pojo.stream.InlongStreamExtParam;
 import org.apache.inlong.manager.service.sink.AbstractSinkOperator;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -55,9 +55,9 @@ public class TubeSinkOperator extends AbstractSinkOperator {
             throw new BusinessException(ErrorCodeEnum.SINK_TYPE_NOT_SUPPORT,
                     ErrorCodeEnum.SINK_TYPE_NOT_SUPPORT.getMessage() + ": " + getSinkType());
         }
-        TubeSinkRequest sinkRequest = (TubeSinkRequest) request;
+        TubeMQSinkRequest sinkRequest = (TubeMQSinkRequest) request;
         try {
-            TubeSinkDTO dto = TubeSinkDTO.getFromRequest(sinkRequest, targetEntity.getExtParams());
+            TubeMQSinkDTO dto = TubeMQSinkDTO.getFromRequest(sinkRequest, targetEntity.getExtParams());
 
             InlongStreamEntity stream = inlongStreamEntityMapper
                     .selectByIdentifier(request.getInlongGroupId(), request.getInlongStreamId());
@@ -84,12 +84,12 @@ public class TubeSinkOperator extends AbstractSinkOperator {
 
     @Override
     public StreamSink getFromEntity(StreamSinkEntity entity) {
-        TubeSink sink = new TubeSink();
+        TubeMQSink sink = new TubeMQSink();
         if (entity == null) {
             return sink;
         }
 
-        TubeSinkDTO dto = TubeSinkDTO.getFromJson(entity.getExtParams());
+        TubeMQSinkDTO dto = TubeMQSinkDTO.getFromJson(entity.getExtParams());
         DataNodeEntity dataNodeEntity = dataNodeEntityMapper.selectByUniqueKey(entity.getDataNodeName(),
                 DataNodeType.TUBEMQ);
         TubeMQDataNodeDTO tubeMQDataNodeDTO = JsonUtils.parseObject(dataNodeEntity.getExtParams(),

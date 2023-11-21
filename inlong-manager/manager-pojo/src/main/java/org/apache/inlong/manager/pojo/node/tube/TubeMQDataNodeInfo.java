@@ -38,7 +38,7 @@ import lombok.ToString;
 @ApiModel("TubeMQ data node info")
 public class TubeMQDataNodeInfo extends DataNodeInfo {
 
-    private String masterHostList;
+    private String masterHost;
     private String linkMaxDelayMsgCount;
     private String sessionWarnDelayedMsgCount;
     private String sessionMaxDelayMsgCount;

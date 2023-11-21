@@ -30,7 +30,7 @@ import org.apache.inlong.manager.common.util.JsonUtils;
 public class TubeMQDataNodeDTO {
 
     @JsonProperty("master-host-port-list")
-    private String masterHostList;
+    private String masterHost;
     @JsonProperty("link_max_allowed_delayed_msg_count")
     private String linkMaxDelayMsgCount;
     @JsonProperty("session_warn_delayed_msg_count")

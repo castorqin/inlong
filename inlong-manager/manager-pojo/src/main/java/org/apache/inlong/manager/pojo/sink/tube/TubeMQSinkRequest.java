@@ -19,32 +19,23 @@ package org.apache.inlong.manager.pojo.sink.tube;
 
 import org.apache.inlong.manager.common.consts.SinkType;
 import org.apache.inlong.manager.common.util.JsonTypeDefine;
-import org.apache.inlong.manager.pojo.sink.StreamSink;
+import org.apache.inlong.manager.pojo.sink.SinkRequest;
 
 import io.swagger.annotations.ApiModel;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
-/**
- * Tube mq sink info
- */
 @Data
 @ToString(callSuper = true)
 @EqualsAndHashCode(callSuper = true)
-@ApiModel(value = "Tube mq sink info")
+@ApiModel(value = "TubeMQ sink request")
 @JsonTypeDefine(value = SinkType.TUBEMQ)
-public class TubeSink extends StreamSink {
+public class TubeMQSinkRequest extends SinkRequest {
 
     private String tid;
     private String bid;
     private String topic;
     private String delimiter;
     private String dataType;
-    private String masterHost;
-    private String linkMaxDelayedMsgCount;
-    private String sessionWarnDelayedMsgCount;
-    private String sessionMaxDelayedMsgCount;
-    private String rpcTimeOutMs;
-    private String tubeHbPeriodMs;
 }

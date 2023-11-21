@@ -37,7 +37,7 @@ import javax.validation.constraints.NotNull;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class TubeSinkDTO {
+public class TubeMQSinkDTO {
 
     private String tid;
     private String bid;
@@ -48,16 +48,16 @@ public class TubeSinkDTO {
     /**
      * Get the dto instance from the request
      */
-    public static TubeSinkDTO getFromRequest(TubeSinkRequest request, String extParams) {
-        TubeSinkDTO dto = StringUtils.isNotBlank(extParams)
-                ? TubeSinkDTO.getFromJson(extParams)
-                : new TubeSinkDTO();
+    public static TubeMQSinkDTO getFromRequest(TubeMQSinkRequest request, String extParams) {
+        TubeMQSinkDTO dto = StringUtils.isNotBlank(extParams)
+                ? TubeMQSinkDTO.getFromJson(extParams)
+                : new TubeMQSinkDTO();
         return CommonBeanUtils.copyProperties(request, dto, true);
     }
 
-    public static TubeSinkDTO getFromJson(@NotNull String extParams) {
+    public static TubeMQSinkDTO getFromJson(@NotNull String extParams) {
         try {
-            return JsonUtils.parseObject(extParams, TubeSinkDTO.class);
+            return JsonUtils.parseObject(extParams, TubeMQSinkDTO.class);
         } catch (Exception e) {
             throw new BusinessException(ErrorCodeEnum.SINK_INFO_INCORRECT,
                     String.format("parse extParams of CLS SinkDTO failure: %s", e.getMessage()));
