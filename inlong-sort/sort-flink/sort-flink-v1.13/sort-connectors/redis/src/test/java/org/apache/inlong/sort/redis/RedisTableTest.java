@@ -47,7 +47,7 @@ public class RedisTableTest {
     @BeforeClass
     public static void setup() {
         redisPort = NetUtils.getAvailablePort();
-        redisServer = RedisServer.builder().setting("maxmemory 128m").port(redisPort).build();
+        redisServer = new RedisServer(redisPort);
         redisServer.start();
     }
 

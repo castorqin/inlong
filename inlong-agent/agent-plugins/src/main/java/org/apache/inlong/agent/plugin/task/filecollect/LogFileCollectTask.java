@@ -27,6 +27,7 @@ import org.apache.inlong.agent.core.instance.InstanceManager;
 import org.apache.inlong.agent.core.task.TaskAction;
 import org.apache.inlong.agent.core.task.file.TaskManager;
 import org.apache.inlong.agent.db.Db;
+import org.apache.inlong.agent.metrics.audit.AuditUtils;
 import org.apache.inlong.agent.plugin.file.Task;
 import org.apache.inlong.agent.plugin.task.filecollect.FileScanner.BasicFileInfo;
 import org.apache.inlong.agent.plugin.utils.file.FilePathUtil;
@@ -34,6 +35,7 @@ import org.apache.inlong.agent.plugin.utils.file.NewDateUtils;
 import org.apache.inlong.agent.plugin.utils.file.PathDateExpression;
 import org.apache.inlong.agent.state.State;
 import org.apache.inlong.agent.utils.AgentUtils;
+import org.apache.inlong.agent.utils.DateTransUtils;
 import org.apache.inlong.agent.utils.file.FileUtils;
 
 import org.slf4j.Logger;
@@ -70,6 +72,7 @@ public class LogFileCollectTask extends Task {
 
     public static final String DEFAULT_FILE_INSTANCE = "org.apache.inlong.agent.plugin.instance.FileInstance";
     private static final Logger LOGGER = LoggerFactory.getLogger(LogFileCollectTask.class);
+    public static final String SCAN_CYCLE_RANCE = "-2";
     private TaskProfile taskProfile;
     private Db basicDb;
     private TaskManager taskManager;
@@ -86,7 +89,7 @@ public class LogFileCollectTask extends Task {
     private boolean retry;
     private long startTime;
     private long endTime;
-    private boolean isRealTime = false;
+    private boolean realTime = false;
     private boolean initOK = false;
     private Set<String> originPatterns;
     private long lastScanTime = 0;
@@ -97,10 +100,6 @@ public class LogFileCollectTask extends Task {
 
     @Override
     public void init(Object srcManager, TaskProfile taskProfile, Db basicDb) throws IOException {
-        if (!isProfileValid(taskProfile)) {
-            LOGGER.error("task profile invalid {}", taskProfile.toJsonStr());
-            return;
-        }
         taskManager = (TaskManager) srcManager;
         commonInit(taskProfile, basicDb);
         if (retry) {
@@ -118,10 +117,10 @@ public class LogFileCollectTask extends Task {
         originPatterns = Stream.of(taskProfile.get(TaskConstants.FILE_DIR_FILTER_PATTERNS).split(","))
                 .collect(Collectors.toSet());
         if (taskProfile.getCycleUnit().compareToIgnoreCase(CycleUnitType.REAL_TIME) == 0) {
-            isRealTime = true;
+            realTime = true;
         }
         instanceManager = new InstanceManager(taskProfile.getTaskId(), taskProfile.getInt(TaskConstants.FILE_MAX_NUM),
-                basicDb);
+                basicDb, taskManager.getTaskDb());
         try {
             instanceManager.start();
         } catch (Exception e) {
@@ -129,7 +128,8 @@ public class LogFileCollectTask extends Task {
         }
     }
 
-    private boolean isProfileValid(TaskProfile profile) {
+    @Override
+    public boolean isProfileValid(TaskProfile profile) {
         if (!profile.allRequiredKeyExist()) {
             LOGGER.error("task profile needs all required key");
             return false;
@@ -185,11 +185,7 @@ public class LogFileCollectTask extends Task {
              * linux regular expression, we have to replace * to ., and replace . with \\. .
              */
             WatchService watchService = FileSystems.getDefault().newWatchService();
-            String timeOffset = "";
-            if (!isRealTime) {
-                timeOffset = taskProfile.getTimeOffset();
-            }
-            WatchEntity entity = new WatchEntity(watchService, originPattern, taskProfile.getCycleUnit(), timeOffset);
+            WatchEntity entity = new WatchEntity(watchService, originPattern, taskProfile.getCycleUnit());
             entity.registerRecursively();
             watchers.put(originPattern, entity);
             watchFailedDirs.remove(originPattern);
@@ -252,6 +248,15 @@ public class LogFileCollectTask extends Task {
     public void run() {
         Thread.currentThread().setName("directory-task-core-" + getTaskId());
         running = true;
+        try {
+            doRun();
+        } catch (Throwable e) {
+            LOGGER.error("do run error: ", e);
+        }
+        running = false;
+    }
+
+    private void doRun() {
         while (!isFinished()) {
             if (AgentUtils.getCurrentTime() - lastPrintTime > CORE_THREAD_PRINT_TIME) {
                 LOGGER.info("log file task running! taskId {}", getTaskId());
@@ -267,14 +272,17 @@ public class LogFileCollectTask extends Task {
             } else {
                 runForNormal();
             }
+            String inlongGroupId = taskProfile.getInlongGroupId();
+            String inlongStreamId = taskProfile.getInlongStreamId();
+            AuditUtils.add(AuditUtils.AUDIT_ID_AGENT_TASK_HEARTBEAT, inlongGroupId, inlongStreamId,
+                    AgentUtils.getCurrentTime(), 1, 1);
         }
-        running = false;
     }
 
     private void runForRetry() {
         if (!runAtLeastOneTime) {
             scanExistingFile();
-            dealWithEvenMap();
+            dealWithEventMap();
             runAtLeastOneTime = true;
         }
         if (instanceManager.allInstanceFinished()) {
@@ -291,7 +299,7 @@ public class LogFileCollectTask extends Task {
             lastScanTime = AgentUtils.getCurrentTime();
         }
         runForWatching();
-        dealWithEvenMap();
+        dealWithEventMap();
     }
 
     private void scanExistingFile() {
@@ -321,11 +329,11 @@ public class LogFileCollectTask extends Task {
         if (!retry) {
             long currentTime = System.currentTimeMillis();
             // only scan two cycle, like two hours or two days
-            long offset = NewDateUtils.calcOffset("-2" + taskProfile.getCycleUnit());
+            long offset = DateTransUtils.calcOffset(SCAN_CYCLE_RANCE + taskProfile.getCycleUnit());
             startScanTime = currentTime + offset;
             endScanTime = currentTime;
         }
-        if (isRealTime) {
+        if (realTime) {
             return FileScanner.scanTaskBetweenTimes(originPattern, CycleUnitType.HOUR, taskProfile.getTimeOffset(),
                     startScanTime, endScanTime, retry);
         } else {
@@ -349,27 +357,76 @@ public class LogFileCollectTask extends Task {
         }
     }
 
-    private void dealWithEvenMap() {
-        removeTimeoutEven(eventMap, retry);
-        for (Map.Entry<String, Map<String, InstanceProfile>> entry : eventMap.entrySet()) {
-            Map<String, InstanceProfile> sameDataTimeEvents = entry.getValue();
-            if (sameDataTimeEvents.isEmpty()) {
-                continue;
+    private void dealWithEventMap() {
+        removeTimeoutEvent(eventMap, retry);
+        if (realTime) {
+            dealWithEventMapRealTime();
+        } else {
+            dealWithEventMapWithCycle();
+        }
+    }
+
+    private void dealWithEventMapWithCycle() {
+        long startScanTime = startTime;
+        long endScanTime = endTime;
+        if (!retry) {
+            long currentTime = System.currentTimeMillis();
+            // only scan two cycle, like two hours or two days
+            long offset = DateTransUtils.calcOffset(SCAN_CYCLE_RANCE + taskProfile.getCycleUnit());
+            startScanTime = currentTime + offset;
+            endScanTime = currentTime;
+        }
+        List<String> dataTimeList = FileScanner.getDataTimeList(startScanTime, endScanTime, taskProfile.getCycleUnit(),
+                taskProfile.getTimeOffset(), retry);
+        if (dataTimeList.isEmpty()) {
+            LOGGER.error("getDataTimeList get empty list");
+            return;
+        }
+        Set<String> dealtDataTime = new HashSet<>();
+        // normal task first handle current data time
+        if (!retry) {
+            String current = dataTimeList.remove(dataTimeList.size() - 1);
+            dealEventMapByDataTime(current, true);
+            dealtDataTime.add(current);
+        }
+        dataTimeList.forEach(dataTime -> {
+            dealtDataTime.add(dataTime);
+            dealEventMapByDataTime(dataTime, false);
+        });
+        for (String dataTime : eventMap.keySet()) {
+            if (!dealtDataTime.contains(dataTime)) {
+                dealEventMapByDataTime(dataTime, false);
             }
-            if (isRealTime || shouldStartNow(entry.getKey())) {
-                /* These codes will sort the FileCreationEvents by create time. */
-                Set<InstanceProfile> sortedEvents = new TreeSet<>(sameDataTimeEvents.values());
-                /* Check the file end with event creation time in asc order. */
-                for (InstanceProfile sortEvent : sortedEvents) {
-                    String fileName = sortEvent.getInstanceId();
-                    InstanceProfile profile = sameDataTimeEvents.get(fileName);
-                    InstanceAction action = new InstanceAction(ActionType.ADD, profile);
-                    while (!instanceManager.submitAction(action)) {
-                        LOGGER.error("instance manager action queue is full: taskId {}", instanceManager.getTaskId());
-                        AgentUtils.silenceSleepInMs(CORE_THREAD_SLEEP_TIME);
-                    }
-                    sameDataTimeEvents.remove(fileName);
+        }
+    }
+
+    private void dealWithEventMapRealTime() {
+        for (String dataTime : eventMap.keySet()) {
+            dealEventMapByDataTime(dataTime, true);
+        }
+    }
+
+    private void dealEventMapByDataTime(String dataTime, boolean isCurrentDataTime) {
+        Map<String, InstanceProfile> sameDataTimeEvents = eventMap.get(dataTime);
+        if (sameDataTimeEvents == null || sameDataTimeEvents.isEmpty()) {
+            return;
+        }
+        if (realTime || shouldStartNow(dataTime)) {
+            /* These codes will sort the FileCreationEvents by create time. */
+            Set<InstanceProfile> sortedEvents = new TreeSet<>(sameDataTimeEvents.values());
+            /* Check the file end with event creation time in asc order. */
+            for (InstanceProfile sortEvent : sortedEvents) {
+                String fileName = sortEvent.getInstanceId();
+                InstanceProfile profile = sameDataTimeEvents.get(fileName);
+                InstanceAction action = new InstanceAction(ActionType.ADD, profile);
+                if (!isCurrentDataTime && instanceManager.isFull()) {
+                    return;
                 }
+                while (!isFinished() && !instanceManager.submitAction(action)) {
+                    LOGGER.error("instance manager action queue is full: taskId {}", instanceManager.getTaskId());
+                    AgentUtils.silenceSleepInMs(CORE_THREAD_SLEEP_TIME);
+                }
+                sameDataTimeEvents.remove(fileName);
             }
         }
     }
@@ -385,8 +442,8 @@ public class LogFileCollectTask extends Task {
         return currentTime.compareTo(shouldStartTime) >= 0;
     }
 
-    private void removeTimeoutEven(Map<String, Map<String, InstanceProfile>> eventMap, boolean isRetry) {
-        if (isRetry || isRealTime) {
+    private void removeTimeoutEvent(Map<String, Map<String, InstanceProfile>> eventMap, boolean isRetry) {
+        if (isRetry || realTime) {
             return;
         }
         for (Map.Entry<String, Map<String, InstanceProfile>> entry : eventMap.entrySet()) {
@@ -503,7 +560,7 @@ public class LogFileCollectTask extends Task {
             return;
         }
         String cycleUnit = "";
-        if (isRealTime) {
+        if (realTime) {
             cycleUnit = CycleUnitType.HOUR;
         } else {
             cycleUnit = taskProfile.getCycleUnit();
@@ -521,7 +578,7 @@ public class LogFileCollectTask extends Task {
             String dataTime = getDataTimeFromFileName(newFileName, entity.getOriginPattern(), dateExpression);
             LOGGER.info("file {} ,fileTime {}", newFileName, dataTime);
             if (!NewDateUtils.isValidCreationTime(dataTime, entity.getCycleUnit(),
-                    entity.getTimeOffset())) {
+                    taskProfile.getTimeOffset())) {
                 return false;
             }
         }

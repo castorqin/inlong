@@ -17,7 +17,9 @@
 
 package org.apache.inlong.manager.service.resource.sink;
 
-import org.apache.inlong.manager.common.consts.InlongConstants;
+import org.apache.inlong.manager.common.consts.SinkType;
+import org.apache.inlong.manager.common.enums.ErrorCodeEnum;
+import org.apache.inlong.manager.common.enums.SinkStatus;
 import org.apache.inlong.manager.common.util.Preconditions;
 import org.apache.inlong.manager.dao.entity.InlongClusterEntity;
 import org.apache.inlong.manager.dao.entity.InlongGroupEntity;
@@ -26,17 +28,18 @@ import org.apache.inlong.manager.dao.mapper.InlongClusterEntityMapper;
 import org.apache.inlong.manager.dao.mapper.InlongGroupEntityMapper;
 import org.apache.inlong.manager.dao.mapper.StreamSinkEntityMapper;
 import org.apache.inlong.manager.pojo.sink.SinkInfo;
+import org.apache.inlong.manager.service.sink.StreamSinkService;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.Sets;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.CollectionUtils;
 
 import java.util.List;
 import java.util.Random;
-import java.util.stream.Collectors;
 
+@Slf4j
 public abstract class AbstractStandaloneSinkResourceOperator implements SinkResourceOperator {
 
     @Autowired
@@ -45,14 +48,20 @@ public abstract class AbstractStandaloneSinkResourceOperator implements SinkReso
     private StreamSinkEntityMapper sinkEntityMapper;
     @Autowired
     private InlongGroupEntityMapper groupEntityMapper;
-
-    private static final String SORT_PREFIX = "SORT_";
+    @Autowired
+    private StreamSinkService sinkService;
 
     private Random rand = new Random();
 
     @VisibleForTesting
     protected void assignCluster(SinkInfo sinkInfo) {
+        if (StringUtils.isBlank(sinkInfo.getSinkType())) {
+            throw new IllegalArgumentException(ErrorCodeEnum.SINK_TYPE_IS_NULL.getMessage());
+        }
+
         if (StringUtils.isNotBlank(sinkInfo.getInlongClusterName())) {
+            String info = "no need to auto-assign cluster since the cluster has already assigned";
+            sinkService.updateStatus(sinkInfo.getId(), SinkStatus.CONFIG_SUCCESSFUL.getCode(), info);
             return;
         }
 
@@ -64,6 +73,7 @@ public abstract class AbstractStandaloneSinkResourceOperator implements SinkReso
 
         StreamSinkEntity sink = sinkEntityMapper.selectByPrimaryKey(sinkInfo.getId());
         sink.setInlongClusterName(targetCluster);
+        sink.setStatus(SinkStatus.CONFIG_SUCCESSFUL.getCode());
         sinkEntityMapper.updateByIdSelective(sink);
     }
 
@@ -79,19 +89,24 @@ public abstract class AbstractStandaloneSinkResourceOperator implements SinkReso
 
     private String assignFromRelated(String sinkType, String groupId) {
         InlongGroupEntity group = groupEntityMapper.selectByGroupId(groupId);
-        String sortClusterType = SORT_PREFIX.concat(sinkType);
-        List<InlongClusterEntity> clusters = clusterEntityMapper
-                .selectByKey(null, null, sortClusterType).stream()
-                .filter(cluster -> checkCluster(cluster.getClusterTags(), group.getInlongClusterTag()))
-                .collect(Collectors.toList());
+        String sortClusterType = SinkType.relatedSortClusterType(sinkType);
+        if (StringUtils.isBlank(sortClusterType)) {
+            log.error("find no relate sort cluster type for sink type={}", sinkType);
+            return null;
+        }
+
+        // if some clusters have the same tag
+        List<InlongClusterEntity> clusters =
+                clusterEntityMapper.selectByKey(group.getInlongClusterTag(), null, sortClusterType);
+        if (!CollectionUtils.isEmpty(clusters)) {
+            return clusters.get(rand.nextInt(clusters.size())).getName();
+        }
+
+        // if no cluster with the same tag
+        clusters = clusterEntityMapper.selectByKey(null, null, sortClusterType);
 
         return CollectionUtils.isEmpty(clusters) ? null : clusters.get(rand.nextInt(clusters.size())).getName();
 
-    }
-
-    private boolean checkCluster(String clusterTags, String targetTag) {
-        return StringUtils.isBlank(clusterTags)
-                || Sets.newHashSet(clusterTags.split(InlongConstants.COMMA)).contains(targetTag);
     }
 
 }

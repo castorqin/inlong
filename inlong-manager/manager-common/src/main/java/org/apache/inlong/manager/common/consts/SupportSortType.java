@@ -15,43 +15,24 @@
  * limitations under the License.
  */
 
-package org.apache.inlong.dataproxy.config.holder;
+package org.apache.inlong.manager.common.consts;
 
-public class SourceReportInfo {
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
-    private String ip;
+/**
+ * This annotation is used to indicate the type of inbound task used for inbound operations, including sort flink and
+ * sort standalone. On the user's SinkType class field, this annotation is used to identify which type of sort task each
+ * SinkType uses.
+ */
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@Target({ElementType.FIELD})
+public @interface SupportSortType {
 
-    private String port;
+    SortType sortType();
 
-    private String protocolType;
-
-    public SourceReportInfo(String ip, String port, String protocolType) {
-        this.ip = ip;
-        this.port = port;
-        this.protocolType = protocolType;
-    }
-
-    public String getIp() {
-        return ip;
-    }
-
-    public void setIp(String ip) {
-        this.ip = ip;
-    }
-
-    public String getPort() {
-        return port;
-    }
-
-    public void setPort(String port) {
-        this.port = port;
-    }
-
-    public String getProtocolType() {
-        return protocolType;
-    }
-
-    public void setProtocolType(String protocolType) {
-        this.protocolType = protocolType;
-    }
 }

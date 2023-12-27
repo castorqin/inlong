@@ -19,6 +19,7 @@ package org.apache.inlong.sort.tests;
 
 import org.apache.inlong.sort.tests.utils.FlinkContainerTestEnv;
 import org.apache.inlong.sort.tests.utils.JdbcProxy;
+import org.apache.inlong.sort.tests.utils.MySqlContainer;
 import org.apache.inlong.sort.tests.utils.StarRocksContainer;
 import org.apache.inlong.sort.tests.utils.TestUtils;
 
@@ -28,9 +29,7 @@ import org.junit.ClassRule;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
-import org.testcontainers.utility.DockerImageName;
 
 import java.net.URISyntaxException;
 import java.nio.file.Path;
@@ -40,7 +39,7 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static org.apache.inlong.sort.tests.utils.StarRocksManager.INTER_CONTAINER_STAR_ROCKS_ALIAS;
@@ -48,23 +47,24 @@ import static org.apache.inlong.sort.tests.utils.StarRocksManager.STAR_ROCKS_LOG
 import static org.apache.inlong.sort.tests.utils.StarRocksManager.buildStarRocksImage;
 import static org.apache.inlong.sort.tests.utils.StarRocksManager.getNewStarRocksImageName;
 import static org.apache.inlong.sort.tests.utils.StarRocksManager.initializeStarRocksTable;
+
 /**
  * End-to-end tests for sort-connector-postgres-cdc-v1.15 uber jar.
- * Test flink sql Postgres cdc to StarRocks
+ * Test flink sql Mysql cdc to StarRocks
  */
-public class PostgresToStarRocksTest extends FlinkContainerTestEnv {
+public class MysqlToRocksITCase extends FlinkContainerTestEnv {
 
-    private static final Logger LOG = LoggerFactory.getLogger(PostgresToStarRocksTest.class);
+    private static final Logger LOG = LoggerFactory.getLogger(MysqlToRocksITCase.class);
 
-    private static final Path postgresJar = TestUtils.getResource("sort-connector-postgres-cdc.jar");
+    private static final Path mysqlJar = TestUtils.getResource("sort-connector-mysql-cdc.jar");
     private static final Path jdbcJar = TestUtils.getResource("sort-connector-starrocks.jar");
     private static final Path mysqlJdbcJar = TestUtils.getResource("mysql-driver.jar");
     private static final String sqlFile;
 
     static {
         try {
-            sqlFile = Paths.get(PostgresToStarRocksTest.class.getResource("/flinkSql/postgres_test.sql").toURI())
-                    .toString();
+            sqlFile =
+                    Paths.get(MysqlToRocksITCase.class.getResource("/flinkSql/mysql_test.sql").toURI()).toString();
             buildStarRocksImage();
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
@@ -81,28 +81,26 @@ public class PostgresToStarRocksTest extends FlinkContainerTestEnv {
                     .withLogConsumer(new Slf4jLogConsumer(STAR_ROCKS_LOG));
 
     @ClassRule
-    public static final PostgreSQLContainer POSTGRES_CONTAINER = (PostgreSQLContainer) new PostgreSQLContainer(
-            DockerImageName.parse("debezium/postgres:13").asCompatibleSubstituteFor("postgres"))
-                    .withUsername("flinkuser")
-                    .withPassword("flinkpw")
+    public static final MySqlContainer MYSQL_CONTAINER =
+            (MySqlContainer) new MySqlContainer(MySqlContainer.MySqlVersion.V8_0)
                     .withDatabaseName("test")
                     .withNetwork(NETWORK)
-                    .withNetworkAliases("postgres")
+                    .withNetworkAliases("mysql")
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     @Before
     public void setup() {
         waitUntilJobRunning(Duration.ofSeconds(30));
-        initializePostgresTable();
+        initializeMysqlTable();
         initializeStarRocksTable(STAR_ROCKS);
     }
 
-    private void initializePostgresTable() {
+    private void initializeMysqlTable() {
         try {
-            Class.forName(POSTGRES_CONTAINER.getDriverClassName());
+            Class.forName(MYSQL_CONTAINER.getDriverClassName());
             Connection conn = DriverManager
-                    .getConnection(POSTGRES_CONTAINER.getJdbcUrl(), POSTGRES_CONTAINER.getUsername(),
-                            POSTGRES_CONTAINER.getPassword());
+                    .getConnection(MYSQL_CONTAINER.getJdbcUrl(), MYSQL_CONTAINER.getUsername(),
+                            MYSQL_CONTAINER.getPassword());
             Statement stat = conn.createStatement();
             stat.execute(
                     "CREATE TABLE test_input1 (\n"
@@ -111,8 +109,6 @@ public class PostgresToStarRocksTest extends FlinkContainerTestEnv {
                             + "  description VARCHAR(512),\n"
                             + "  PRIMARY  KEY(id)\n"
                             + ");");
-            stat.execute(
-                    "ALTER TABLE test_input1 REPLICA IDENTITY FULL; ");
             stat.close();
             conn.close();
         } catch (Exception e) {
@@ -122,8 +118,8 @@ public class PostgresToStarRocksTest extends FlinkContainerTestEnv {
 
     @AfterClass
     public static void teardown() {
-        if (POSTGRES_CONTAINER != null) {
-            POSTGRES_CONTAINER.stop();
+        if (MYSQL_CONTAINER != null) {
+            MYSQL_CONTAINER.stop();
         }
         if (STAR_ROCKS != null) {
             STAR_ROCKS.stop();
@@ -136,14 +132,14 @@ public class PostgresToStarRocksTest extends FlinkContainerTestEnv {
      * @throws Exception The exception may throws when execute the case
      */
     @Test
-    public void testPostgresUpdateAndDelete() throws Exception {
-        submitSQLJob(sqlFile, jdbcJar, postgresJar, mysqlJdbcJar);
+    public void testMysqlUpdateAndDelete() throws Exception {
+        submitSQLJob(sqlFile, jdbcJar, mysqlJar, mysqlJdbcJar);
         waitUntilJobRunning(Duration.ofSeconds(10));
 
         // generate input
         try (Connection conn =
-                DriverManager.getConnection(POSTGRES_CONTAINER.getJdbcUrl(), POSTGRES_CONTAINER.getUsername(),
-                        POSTGRES_CONTAINER.getPassword());
+                DriverManager.getConnection(MYSQL_CONTAINER.getJdbcUrl(), MYSQL_CONTAINER.getUsername(),
+                        MYSQL_CONTAINER.getPassword());
                 Statement stat = conn.createStatement()) {
             stat.execute(
                     "INSERT INTO test_input1 "
@@ -159,12 +155,11 @@ public class PostgresToStarRocksTest extends FlinkContainerTestEnv {
             throw e;
         }
 
-        JdbcProxy proxy =
-                new JdbcProxy(STAR_ROCKS.getJdbcUrl(), STAR_ROCKS.getUsername(),
-                        STAR_ROCKS.getPassword(),
-                        STAR_ROCKS.getDriverClassName());
-        List<String> expectResult =
-                Arrays.asList("2,tom,Big 2-wheel scooter ");
+        JdbcProxy proxy = new JdbcProxy(STAR_ROCKS.getJdbcUrl(), STAR_ROCKS.getUsername(),
+                STAR_ROCKS.getPassword(),
+                STAR_ROCKS.getDriverClassName());
+
+        List<String> expectResult = Collections.singletonList("2,tom,Big 2-wheel scooter ");
         proxy.checkResultWithTimeout(
                 expectResult,
                 "test_output1",
